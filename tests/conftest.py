@@ -11,11 +11,13 @@ from app.main import create_app
 TEST_DATABASE_URL = os.environ.get(
     "TEST_DATABASE_URL", "postgresql+asyncpg://mediaforge:mediaforge@postgres:5432/mediaforge_test"
 )
+# A separate Redis DB so a running compose worker never consumes test messages.
+TEST_REDIS_URL = os.environ.get("TEST_REDIS_URL", "redis://redis:6379/15")
 
 
 @pytest.fixture
 def settings(tmp_path) -> Settings:
-    return Settings(database_url=TEST_DATABASE_URL, storage_root=tmp_path / "media")
+    return Settings(database_url=TEST_DATABASE_URL, redis_url=TEST_REDIS_URL, storage_root=tmp_path / "media")
 
 
 @pytest.fixture

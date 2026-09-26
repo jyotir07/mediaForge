@@ -219,7 +219,7 @@ Rules: fps comes from `avg_frame_rate` (falling back to `r_frame_rate`), parsed 
 **Files:** Create `app/api/media.py`, `app/schemas/media.py`, `app/media/sniff.py`, `tests/unit/test_sniff.py`, `tests/integration/test_media_api.py`
 
 **Interfaces — Produces:**
-- `POST /media` (multipart `file`) → `201 {"media_id", "probe_job_id"}`. The probe job is wired in Task 8; until then `probe_job_id` is `null`.
+- `POST /media?filename=<name>` (raw request body = the video bytes) → `201 {"media_id", "probe_job_id"}`. The probe job is wired in Task 8; until then `probe_job_id` is `null`. *(Changed from multipart during implementation: FastAPI's `UploadFile` spools the whole body to disk before the handler runs, which defeats a streaming size limit.)*
 - `GET /media/{id}` → media record + artifact list + latest job per type.
 - `GET /media/{id}/metadata` → `MediaMetadata` fields, or `409 {"detail":"probe not complete"}`.
 - `sniff_container(head: bytes) -> Literal["mp4","mov","matroska","webm","avi"] | None`, based on magic bytes (`ftyp` at offset 4 with brand, EBML `1A45DFA3`, `RIFF....AVI `).

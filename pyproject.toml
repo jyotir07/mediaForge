@@ -17,6 +17,9 @@ target-version = "py312"
 select = ["E", "F", "I", "UP", "B", "ASYNC", "S"]
 ignore = ["S101"]
 
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
+
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S"]
 "migrations/**" = ["E501"]

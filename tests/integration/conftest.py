@@ -22,6 +22,18 @@ def migrated_db(alembic_cfg: Config) -> None:
     command.upgrade(alembic_cfg, "head")
 
 
+@pytest.fixture(autouse=True)
+async def clean_db() -> AsyncIterator[None]:
+    yield
+    engine = create_async_engine(TEST_DATABASE_URL)
+    try:
+        async with engine.begin() as conn:
+            tables = ", ".join(t.name for t in Base.metadata.sorted_tables)
+            await conn.execute(text(f"TRUNCATE {tables} CASCADE"))
+    finally:
+        await engine.dispose()
+
+
 @pytest.fixture
 async def session() -> AsyncIterator[AsyncSession]:
     engine = create_async_engine(TEST_DATABASE_URL)
@@ -29,8 +41,5 @@ async def session() -> AsyncIterator[AsyncSession]:
         async with AsyncSession(engine, expire_on_commit=False) as s:
             yield s
             await s.rollback()
-        async with engine.begin() as conn:
-            tables = ", ".join(t.name for t in Base.metadata.sorted_tables)
-            await conn.execute(text(f"TRUNCATE {tables} CASCADE"))
     finally:
         await engine.dispose()

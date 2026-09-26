@@ -1,0 +1,125 @@
+import uuid
+from collections.abc import AsyncIterator
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db import get_session
+from app.media.sniff import ALLOWED_EXTENSIONS, MIME_TYPES, SNIFF_BYTES, is_consistent, sniff_container
+from app.models import Artifact, Job, Media
+from app.schemas.media import ArtifactOut, JobSummary, MediaMetadataOut, MediaOut, MediaUploadResponse
+from app.storage.local import Storage, TooLarge, media_key
+
+router = APIRouter()
+
+
+class _Unsupported(Exception):
+    pass
+
+
+def _check_container(head: bytes, ext: str) -> str:
+    container = sniff_container(head)
+    if container is None or not is_consistent(ext, container):
+        raise _Unsupported
+    return container
+
+
+async def _sniffed(chunks: AsyncIterator[bytes], ext: str, found: dict[str, str]) -> AsyncIterator[bytes]:
+    """Pass the body through, validating the container from its first bytes before anything is kept."""
+    head = b""
+    async for chunk in chunks:
+        if "container" not in found:
+            head += chunk
+            if len(head) < SNIFF_BYTES:
+                continue
+            found["container"] = _check_container(head, ext)
+            chunk, head = head, b""
+        yield chunk
+    if "container" not in found:
+        found["container"] = _check_container(head, ext)
+        yield head
+
+
+async def _get_media(session: AsyncSession, media_id: uuid.UUID) -> Media:
+    media = await session.get(Media, media_id)
+    if media is None:
+        raise HTTPException(404, "media not found")
+    return media
+
+
+@router.post("/media", status_code=201)
+async def upload_media(
+    request: Request,
+    filename: str = Query(min_length=1, max_length=255),
+    session: AsyncSession = Depends(get_session),
+) -> MediaUploadResponse:
+    ext = Path(filename).suffix.lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(415, f"unsupported file extension {ext!r}")
+
+    max_bytes: int = request.app.state.settings.max_upload_bytes
+    declared = request.headers.get("content-length")
+    if declared and declared.isdigit() and int(declared) > max_bytes:
+        raise HTTPException(413, "file too large")
+
+    storage: Storage = request.app.state.storage
+    media_id = uuid.uuid4()
+    key = media_key(media_id, f"source{ext}")
+    found: dict[str, str] = {}
+    try:
+        size = await storage.write_stream(key, _sniffed(request.stream(), ext, found), max_bytes)
+    except TooLarge:
+        raise HTTPException(413, "file too large") from None
+    except _Unsupported:
+        raise HTTPException(415, "file content is not a supported video container") from None
+
+    try:
+        session.add(Media(id=media_id, original_filename=filename, storage_key=key, size_bytes=size))
+        await session.flush()
+        session.add(
+            Artifact(
+                media_id=media_id,
+                type="SOURCE",
+                storage_key=key,
+                mime_type=MIME_TYPES[found["container"]],
+                size_bytes=size,
+            )
+        )
+        await session.commit()
+    except BaseException:
+        storage.delete(key)
+        raise
+    return MediaUploadResponse(media_id=media_id, probe_job_id=None)
+
+
+@router.get("/media/{media_id}")
+async def get_media(media_id: uuid.UUID, session: AsyncSession = Depends(get_session)) -> MediaOut:
+    media = await _get_media(session, media_id)
+    artifacts = (
+        await session.scalars(
+            select(Artifact).where(Artifact.media_id == media_id).order_by(Artifact.created_at)
+        )
+    ).all()
+    jobs = (await session.scalars(select(Job).where(Job.media_id == media_id).order_by(Job.created_at))).all()
+    latest_per_type = {j.type: j for j in jobs}
+    return MediaOut(
+        id=media.id,
+        original_filename=media.original_filename,
+        size_bytes=media.size_bytes,
+        probe_status=media.probe_status,
+        created_at=media.created_at,
+        artifacts=[ArtifactOut.model_validate(a) for a in artifacts],
+        jobs=[JobSummary.model_validate(j) for j in latest_per_type.values()],
+    )
+
+
+@router.get("/media/{media_id}/metadata")
+async def get_media_metadata(
+    media_id: uuid.UUID, session: AsyncSession = Depends(get_session)
+) -> MediaMetadataOut:
+    media = await _get_media(session, media_id)
+    if media.probe_status != "done":
+        raise HTTPException(409, "probe not complete")
+    return MediaMetadataOut.model_validate(media)

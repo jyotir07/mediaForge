@@ -4,10 +4,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from redis.asyncio import Redis
 
-from app.api import health
+from app.api import health, media
 from app.config import Settings, get_settings
 from app.db import create_engine, create_session_factory
 from app.logging import configure_logging
+from app.storage.local import Storage
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -20,6 +21,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.engine = create_engine(settings)
         app.state.session_factory = create_session_factory(app.state.engine)
         app.state.redis = Redis.from_url(settings.redis_url, socket_connect_timeout=2, socket_timeout=5)
+        settings.storage_root.mkdir(parents=True, exist_ok=True)
+        app.state.storage = Storage(settings.storage_root)
         try:
             yield
         finally:
@@ -28,4 +31,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(title="MediaForge", lifespan=lifespan)
     app.include_router(health.router)
+    app.include_router(media.router)
     return app

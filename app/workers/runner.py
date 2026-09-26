@@ -14,9 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.ai.llm import LLMClient, create_llm
 from app.config import Settings, get_settings
 from app.db import create_engine, create_session_factory
+from app.decision import DecisionLayer, create_decision_layer
 from app.jobs import service
-from app.jobs.errors import ErrorCode, JobError, Recoverability, recoverability
-from app.jobs.service import RetryDecision
+from app.jobs.errors import ErrorCode, JobError
 from app.jobs.states import JobStatus, Stage
 from app.logging import configure_logging, log_event
 from app.models import Job, Media
@@ -24,10 +24,7 @@ from app.queue import redis_queue
 from app.storage.local import Storage
 from app.workers import analysis, probe, proxy  # noqa: F401 - registers handlers
 from app.workers.context import HANDLERS, JobContext, LeaseLost
-
-
-async def decide_retry(err: JobError, job: Job) -> RetryDecision:
-    return RetryDecision(retry=recoverability(err.code) is not Recoverability.FATAL)
+from app.workers.recovery import decide_retry
 
 
 class Worker:
@@ -43,6 +40,7 @@ class Worker:
         sweep_s: float = 15,
         dequeue_timeout_s: float = 5,
         llm: LLMClient | None = None,
+        decisions: DecisionLayer | None = None,
     ):
         self.settings = settings
         self.session_factory = session_factory
@@ -54,6 +52,7 @@ class Worker:
         self.sweep_s = sweep_s
         self.dequeue_timeout_s = dequeue_timeout_s
         self.llm = llm
+        self.decisions = decisions or DecisionLayer.with_jev(None)
 
     async def run(self, stop: asyncio.Event) -> None:
         log_event("worker.started", worker_id=self.worker_id)
@@ -126,6 +125,7 @@ class Worker:
             redis=self.redis,
             worker_id=self.worker_id,
             llm=self.llm,
+            decisions=self.decisions,
         )
         work = asyncio.create_task(HANDLERS[job.type](ctx))
         lease_lost = asyncio.Event()
@@ -141,10 +141,10 @@ class Worker:
             log_event("job.lease_lost", level=logging.WARNING, job_id=job.id, worker_id=self.worker_id)
             return
         except JobError as err:
-            await self._fail(job, err, started)
+            await self._fail(job, media, err, started)
         except Exception as exc:
             log_event("job.crashed", level=logging.ERROR, exc_info=True, job_id=job.id, type=job.type)
-            await self._fail(job, JobError(ErrorCode.PROCESS_INTERRUPTED, repr(exc)[:500]), started)
+            await self._fail(job, media, JobError(ErrorCode.PROCESS_INTERRUPTED, repr(exc)[:500]), started)
         else:
             async with self.session_factory() as s:
                 ok = await service.succeed(s, job.id, self.worker_id, result)
@@ -166,8 +166,8 @@ class Worker:
             with suppress(asyncio.CancelledError):
                 await beat
 
-    async def _fail(self, job: Job, err: JobError, started: float) -> None:
-        decision = await decide_retry(err, job)
+    async def _fail(self, job: Job, media: Media, err: JobError, started: float) -> None:
+        decision = await decide_retry(err, job, media, self.decisions.recovery)
         async with self.session_factory() as s:
             status = await service.fail(s, job.id, self.worker_id, err, decision)
         if status is None:
@@ -216,6 +216,7 @@ async def main() -> None:
         redis,
         Storage(settings.storage_root),
         llm=create_llm(settings),
+        decisions=create_decision_layer(settings),
     )
 
     stop = asyncio.Event()

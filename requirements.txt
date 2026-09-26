@@ -7,3 +7,4 @@ redis>=5.0,<7
 pydantic>=2.7,<3
 pydantic-settings>=2.3,<3
 anthropic>=0.70
+langchain-typesafe==0.0.1a3  # alpha API: pinned exactly

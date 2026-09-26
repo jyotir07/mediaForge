@@ -1,14 +1,18 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from redis.asyncio import Redis
 
-from app.api import exports, health, jobs, media
+from app.api import artifacts, exports, health, jobs, media
 from app.config import Settings, get_settings
 from app.db import create_engine, create_session_factory
 from app.logging import configure_logging
 from app.storage.local import Storage
+
+FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -34,4 +38,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(media.router)
     app.include_router(jobs.router)
     app.include_router(exports.router)
+    app.include_router(artifacts.router)
+    # Mounted last so API routes always take precedence over the UI.
+    app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
     return app

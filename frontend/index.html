@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MediaForge</title>
+  <style>
+    :root { --fg: #1d2330; --muted: #6b7385; --line: #e3e6ec; --accent: #2f6fed; --ok: #1f9d55; --bad: #d64545; --bg: #f7f8fa; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--fg); background: var(--bg); }
+    main { max-width: 980px; margin: 0 auto; padding: 24px 16px 64px; }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    h2 { font-size: 16px; margin: 0 0 12px; }
+    .sub { color: var(--muted); margin: 0 0 24px; }
+    section { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+    section[hidden] { display: none; }
+    button { font: inherit; padding: 6px 14px; border-radius: 6px; border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer; }
+    button:disabled { opacity: .45; cursor: default; }
+    button.secondary { background: #fff; color: var(--accent); }
+    textarea { width: 100%; font: inherit; padding: 8px; border: 1px solid var(--line); border-radius: 6px; resize: vertical; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--muted); font-weight: 500; }
+    .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; min-width: 120px; flex: 1; }
+    .bar > div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+    .status { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: var(--line); }
+    .status.SUCCEEDED, .status.READY { background: #e3f5ea; color: var(--ok); }
+    .status.FAILED { background: #fbe7e7; color: var(--bad); }
+    .status.RUNNING, .status.RETRYING { background: #e6eefd; color: var(--accent); }
+    .muted { color: var(--muted); }
+    .err { color: var(--bad); font-size: 13px; }
+    img.sheet { max-width: 100%; border-radius: 6px; margin-top: 12px; }
+    img.frame { width: 96px; border-radius: 4px; }
+    video { width: 100%; border-radius: 6px; background: #000; margin-top: 12px; }
+    .kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px 16px; }
+    .kv div span { display: block; color: var(--muted); font-size: 12px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>MediaForge</h1>
+  <p class="sub">Upload a video, analyze it, request an edit. The LLM proposes clips, Jev decides, FFmpeg renders.</p>
+
+  <section id="upload">
+    <h2>1. Upload</h2>
+    <div class="row">
+      <input type="file" id="file" accept="video/mp4,video/quicktime,video/x-matroska,video/webm,video/x-msvideo,.mp4,.mov,.m4v,.mkv,.webm,.avi">
+      <button id="upload-btn" disabled>Upload</button>
+      <div class="bar"><div id="upload-bar"></div></div>
+    </div>
+    <p class="err" id="upload-err"></p>
+  </section>
+
+  <section id="media" hidden>
+    <h2>2. Media</h2>
+    <div class="kv" id="meta"></div>
+    <div class="row" style="margin-top:12px">
+      <button id="proxy-btn" class="secondary" disabled>Generate proxy</button>
+      <button id="analyze-btn" disabled>Analyze footage</button>
+    </div>
+    <img class="sheet" id="sheet" hidden alt="Contact sheet">
+  </section>
+
+  <section id="pipeline" hidden>
+    <h2>Pipeline</h2>
+    <table><tbody id="jobs"></tbody></table>
+  </section>
+
+  <section id="segments" hidden>
+    <h2>3. Segments</h2>
+    <p class="muted" id="summary"></p>
+    <table>
+      <thead><tr><th>Frame</th><th>Time</th><th>Description</th><th>Relevance</th><th>Audio</th></tr></thead>
+      <tbody id="segment-rows"></tbody>
+    </table>
+  </section>
+
+  <section id="edit" hidden>
+    <h2>4. Edit request</h2>
+    <textarea id="request" rows="2">Create a 45-second highlight reel focused on the most interesting parts.</textarea>
+    <div class="row" style="margin-top:8px"><button id="edit-btn">Plan and export</button></div>
+  </section>
+
+  <section id="decisions" hidden>
+    <h2>Decisions</h2>
+    <table>
+      <thead><tr><th>Clip</th><th>Reason (LLM)</th><th>Validation</th><th>Value</th></tr></thead>
+      <tbody id="decision-rows"></tbody>
+    </table>
+  </section>
+
+  <section id="result" hidden>
+    <h2>5. Export</h2>
+    <div class="kv" id="export-meta"></div>
+    <video id="video" controls></video>
+  </section>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

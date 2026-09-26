@@ -8,6 +8,7 @@ class ErrorCode(StrEnum):
     STORAGE_ERROR = "STORAGE_ERROR"
     PROCESS_INTERRUPTED = "PROCESS_INTERRUPTED"
     TIMEOUT = "TIMEOUT"
+    LLM_UNAVAILABLE = "LLM_UNAVAILABLE"
     # Recoverable with fallback: the recovery classifier picks a predefined profile.
     ENCODER_FAILURE = "ENCODER_FAILURE"
     RESOURCE_EXHAUSTED = "RESOURCE_EXHAUSTED"
@@ -21,6 +22,7 @@ class ErrorCode(StrEnum):
     LLM_OUTPUT_INVALID = "LLM_OUTPUT_INVALID"
     NO_CLIPS_SELECTED = "NO_CLIPS_SELECTED"
     DECISION_UNAVAILABLE = "DECISION_UNAVAILABLE"
+    LLM_REQUEST_FAILED = "LLM_REQUEST_FAILED"
 
 
 class Recoverability(StrEnum):
@@ -34,6 +36,7 @@ _RECOVERABILITY: dict[ErrorCode, Recoverability] = {
     ErrorCode.STORAGE_ERROR: Recoverability.RETRY,
     ErrorCode.PROCESS_INTERRUPTED: Recoverability.RETRY,
     ErrorCode.TIMEOUT: Recoverability.RETRY,
+    ErrorCode.LLM_UNAVAILABLE: Recoverability.RETRY,
     ErrorCode.ENCODER_FAILURE: Recoverability.FALLBACK,
     ErrorCode.RESOURCE_EXHAUSTED: Recoverability.FALLBACK,
     ErrorCode.CORRUPT_SOURCE: Recoverability.FATAL,
@@ -45,6 +48,7 @@ _RECOVERABILITY: dict[ErrorCode, Recoverability] = {
     ErrorCode.LLM_OUTPUT_INVALID: Recoverability.FATAL,
     ErrorCode.NO_CLIPS_SELECTED: Recoverability.FATAL,
     ErrorCode.DECISION_UNAVAILABLE: Recoverability.FATAL,
+    ErrorCode.LLM_REQUEST_FAILED: Recoverability.FATAL,
 }
 
 

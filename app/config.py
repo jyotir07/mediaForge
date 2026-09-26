@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     max_upload_bytes: int = 2 * 1024**3
 
     llm_backend: Literal["anthropic", "fake"] = "anthropic"
-    llm_model: str = "claude-sonnet-5"
+    llm_model: str = "claude-opus-5"
     anthropic_api_key: SecretStr | None = None
 
     decision_backend: Literal["jev", "fake"] = "jev"

@@ -164,3 +164,11 @@ async def request_proxy(
 ) -> JobAccepted:
     await _probed_media(session, media_id)
     return await _submit(request, session, media_id, "proxy", {"profile": "PROXY_STANDARD"})
+
+
+@router.post("/media/{media_id}/analyze", status_code=202)
+async def request_analysis(
+    media_id: uuid.UUID, request: Request, session: AsyncSession = Depends(get_session)
+) -> JobAccepted:
+    await _probed_media(session, media_id)
+    return await _submit(request, session, media_id, "analyze", {"version": 1})

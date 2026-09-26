@@ -6,3 +6,4 @@ alembic>=1.13,<2
 redis>=5.0,<7
 pydantic>=2.7,<3
 pydantic-settings>=2.3,<3
+anthropic>=0.70

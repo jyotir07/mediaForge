@@ -458,12 +458,16 @@ Frames: 1 per segment at the midpoint, max 24 total (evenly subsampled) to bound
 **Interfaces — Produces:**
 ```python
 class LLMClient(Protocol):
-    async def structured(self, *, system: str, content: list[ContentPart], schema: type[T], tool_name: str) -> T
-class AnthropicLLM(LLMClient)   # messages.create with tools=[{name, input_schema: schema.model_json_schema()}],
-                                # tool_choice={"type":"tool","name":tool_name}; images as base64 jpeg parts;
-                                # timeout 60s, SDK max_retries=2; on ValidationError: one repair call including the
-                                # error text; second failure → JobError(LLM_OUTPUT_INVALID)
+    async def generate[T: BaseModel](self, *, system: str, parts: Sequence[Part], schema: type[T]) -> T
+    # raises LLMOutputInvalid on schema mismatch
+async def structured(llm, *, system, parts, schema) -> T   # one repair round, then JobError(LLM_OUTPUT_INVALID)
+class AnthropicLLM(LLMClient)   # beta.messages.parse(output_format=schema): SDK structured outputs;
+                                # model claude-opus-5 (LLM_MODEL); fallbacks="default" (refusal fallback beta);
+                                # images as base64 jpeg; SDK max_retries=2 then LLM_UNAVAILABLE (retryable);
+                                # 4xx / refusal / no credentials → LLM_REQUEST_FAILED (fatal)
 class FakeLLM(LLMClient)        # returns queued canned responses (dicts or raw strings) for tests
+# (Changed during implementation from forced tool use: structured outputs are the documented way to get
+#  schema-valid JSON; model default follows the claude-api guidance instead of claude-sonnet-5.)
 
 class SceneDescription(BaseModel): segment_index: int; summary: str; relevance: float = Field(ge=0, le=1)
 class SceneAnalysis(BaseModel): overall_summary: str; scenes: list[SceneDescription]

@@ -6,6 +6,7 @@ from typing import Any
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.ai.llm import LLMClient
 from app.config import Settings
 from app.jobs import service
 from app.jobs.states import JobStatus, Stage
@@ -29,6 +30,7 @@ class JobContext:
     session_factory: async_sessionmaker[AsyncSession]
     redis: Redis
     worker_id: str
+    llm: LLMClient | None = None
     _last_progress_at: float = field(default=0.0, init=False)
 
     async def progress(self, stage: Stage, fraction: float, message: str, force: bool = False) -> None:

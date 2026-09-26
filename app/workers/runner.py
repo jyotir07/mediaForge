@@ -11,6 +11,7 @@ from typing import Any
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.ai.llm import LLMClient, create_llm
 from app.config import Settings, get_settings
 from app.db import create_engine, create_session_factory
 from app.jobs import service
@@ -21,7 +22,7 @@ from app.logging import configure_logging, log_event
 from app.models import Job, Media
 from app.queue import redis_queue
 from app.storage.local import Storage
-from app.workers import probe, proxy  # noqa: F401 - registers handlers
+from app.workers import analysis, probe, proxy  # noqa: F401 - registers handlers
 from app.workers.context import HANDLERS, JobContext, LeaseLost
 
 
@@ -41,6 +42,7 @@ class Worker:
         heartbeat_s: float = 10,
         sweep_s: float = 15,
         dequeue_timeout_s: float = 5,
+        llm: LLMClient | None = None,
     ):
         self.settings = settings
         self.session_factory = session_factory
@@ -51,6 +53,7 @@ class Worker:
         self.heartbeat_s = heartbeat_s
         self.sweep_s = sweep_s
         self.dequeue_timeout_s = dequeue_timeout_s
+        self.llm = llm
 
     async def run(self, stop: asyncio.Event) -> None:
         log_event("worker.started", worker_id=self.worker_id)
@@ -122,6 +125,7 @@ class Worker:
             session_factory=self.session_factory,
             redis=self.redis,
             worker_id=self.worker_id,
+            llm=self.llm,
         )
         work = asyncio.create_task(HANDLERS[job.type](ctx))
         lease_lost = asyncio.Event()
@@ -206,7 +210,13 @@ async def main() -> None:
     engine = create_engine(settings)
     redis = Redis.from_url(settings.redis_url, socket_connect_timeout=2)
     settings.storage_root.mkdir(parents=True, exist_ok=True)
-    worker = Worker(settings, create_session_factory(engine), redis, Storage(settings.storage_root))
+    worker = Worker(
+        settings,
+        create_session_factory(engine),
+        redis,
+        Storage(settings.storage_root),
+        llm=create_llm(settings),
+    )
 
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()

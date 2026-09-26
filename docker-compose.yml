@@ -1,5 +1,8 @@
 x-app: &app
+  # One image for api and worker so a single build updates both.
+  image: mediaforge:dev
   build: .
+  restart: unless-stopped
   env_file:
     - path: .env
       required: false

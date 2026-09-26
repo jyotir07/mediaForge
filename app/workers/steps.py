@@ -1,7 +1,8 @@
 """Idempotent building blocks shared by media job handlers."""
 
 import uuid
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -48,6 +49,21 @@ async def upsert_artifact(
     return artifact_id
 
 
+@asynccontextmanager
+async def logged(ctx: JobContext, step: str) -> AsyncIterator[Path]:
+    """Yield a log path for an ffmpeg step. On failure the full log is kept as a LOG artifact (the job row
+    only stores a bounded summary); on success it is discarded."""
+    log_key = media_key(ctx.media.id, "logs", f"{ctx.job.id}-a{ctx.job.attempt}-{step}.log")
+    path = ctx.storage.path(log_key)
+    try:
+        yield path
+    except JobError:
+        if path.exists():
+            await upsert_artifact(ctx, "LOG", log_key, "text/plain")
+        raise
+    ctx.storage.delete(log_key)
+
+
 async def produce(
     ctx: JobContext,
     key: str,
@@ -65,27 +81,22 @@ async def produce(
         return False
 
     lo, hi = progress_range
-    log_key = media_key(ctx.media.id, "logs", f"{ctx.job.id}-a{ctx.job.attempt}-{step}.log")
-    tmp = ctx.storage.tmp_path(key)
 
     async def on_progress(fraction: float) -> None:
         await ctx.progress(stage, lo + (hi - lo) * fraction, message)
 
     await ctx.progress(stage, lo, message, force=True)
+    tmp = ctx.storage.tmp_path(key)
     try:
-        await run_ffmpeg(
-            build_args(tmp),
-            total_seconds=total_seconds,
-            on_progress=on_progress,
-            log_path=ctx.storage.path(log_key),
-            timeout_s=ffmpeg_timeout(total_seconds or 0),
-        )
+        async with logged(ctx, step) as log_path:
+            await run_ffmpeg(
+                build_args(tmp),
+                total_seconds=total_seconds,
+                on_progress=on_progress,
+                log_path=log_path,
+                timeout_s=ffmpeg_timeout(total_seconds or 0),
+            )
         ctx.storage.commit(tmp, key)
-    except JobError:
-        # Full stderr lives in storage; the job row only keeps a bounded summary.
-        await upsert_artifact(ctx, "LOG", log_key, "text/plain")
-        raise
     finally:
         tmp.unlink(missing_ok=True)
-    ctx.storage.delete(log_key)
     return True

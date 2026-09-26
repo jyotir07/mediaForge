@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from redis.asyncio import Redis
 
-from app.api import health, media
+from app.api import health, jobs, media
 from app.config import Settings, get_settings
 from app.db import create_engine, create_session_factory
 from app.logging import configure_logging
@@ -32,4 +32,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="MediaForge", lifespan=lifespan)
     app.include_router(health.router)
     app.include_router(media.router)
+    app.include_router(jobs.router)
     return app

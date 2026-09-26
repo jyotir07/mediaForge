@@ -7,8 +7,20 @@ from app.media.ffprobe import ProbeError, probe
 
 def _make_video(path):
     subprocess.run(
-        ["ffmpeg", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=size=320x240:rate=25",
-         "-t", "1", "-c:v", "libx264", str(path)],
+        [
+            "ffmpeg",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=320x240:rate=25",
+            "-t",
+            "1",
+            "-c:v",
+            "libx264",
+            str(path),
+        ],
         check=True,
     )
 

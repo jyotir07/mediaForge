@@ -64,7 +64,8 @@ def parse_ffprobe(raw: dict[str, Any]) -> MediaMetadata:
     fmt = raw.get("format", {})
     video = next(
         (
-            s for s in streams
+            s
+            for s in streams
             if s.get("codec_type") == "video" and not s.get("disposition", {}).get("attached_pic")
         ),
         None,
@@ -98,7 +99,14 @@ def parse_ffprobe(raw: dict[str, Any]) -> MediaMetadata:
 
 async def probe(path: Path, timeout_s: float = 30) -> MediaMetadata:
     proc = await asyncio.create_subprocess_exec(
-        "ffprobe", "-v", "error", "-print_format", "json", "-show_format", "-show_streams", str(path),
+        "ffprobe",
+        "-v",
+        "error",
+        "-print_format",
+        "json",
+        "-show_format",
+        "-show_streams",
+        str(path),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )

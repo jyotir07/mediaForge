@@ -1,3 +1,4 @@
+import logging
 import uuid
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -7,8 +8,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
+from app.jobs import service
+from app.logging import log_event
 from app.media.sniff import ALLOWED_EXTENSIONS, MIME_TYPES, SNIFF_BYTES, is_consistent, sniff_container
 from app.models import Artifact, Job, Media
+from app.queue import redis_queue
 from app.schemas.media import ArtifactOut, JobSummary, MediaMetadataOut, MediaOut, MediaUploadResponse
 from app.storage.local import Storage, TooLarge, media_key
 
@@ -40,6 +44,14 @@ async def _sniffed(chunks: AsyncIterator[bytes], ext: str, found: dict[str, str]
     if "container" not in found:
         found["container"] = _check_container(head, ext)
         yield head
+
+
+async def _enqueue_best_effort(request: Request, job: Job) -> None:
+    # The job row is already durable; if Redis is down the worker sweeper re-enqueues it later.
+    try:
+        await redis_queue.enqueue(request.app.state.redis, job.type, job.id)
+    except Exception:
+        log_event("job.enqueue_failed", level=logging.WARNING, exc_info=True, job_id=job.id)
 
 
 async def _get_media(session: AsyncSession, media_id: uuid.UUID) -> Media:
@@ -91,7 +103,10 @@ async def upload_media(
     except BaseException:
         storage.delete(key)
         raise
-    return MediaUploadResponse(media_id=media_id, probe_job_id=None)
+
+    job, _ = await service.create_or_get(session, media_id, "probe", {})
+    await _enqueue_best_effort(request, job)
+    return MediaUploadResponse(media_id=media_id, probe_job_id=job.id)
 
 
 @router.get("/media/{media_id}")

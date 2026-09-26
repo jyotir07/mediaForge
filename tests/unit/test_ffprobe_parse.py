@@ -67,8 +67,14 @@ def test_audio_only_file_is_rejected():
 def test_cover_art_stream_is_not_treated_as_video():
     raw = load("audio_only")
     raw["streams"].append(
-        {"codec_type": "video", "codec_name": "mjpeg", "width": 300, "height": 300,
-         "avg_frame_rate": "0/0", "disposition": {"attached_pic": 1}}
+        {
+            "codec_type": "video",
+            "codec_name": "mjpeg",
+            "width": 300,
+            "height": 300,
+            "avg_frame_rate": "0/0",
+            "disposition": {"attached_pic": 1},
+        }
     )
     with pytest.raises(ProbeError):
         parse_ffprobe(raw)

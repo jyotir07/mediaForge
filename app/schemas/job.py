@@ -6,6 +6,11 @@ from pydantic import BaseModel
 from app.models import Job
 
 
+class JobAccepted(BaseModel):
+    job_id: uuid.UUID
+    status: str
+
+
 class JobOut(BaseModel):
     job_id: uuid.UUID
     media_id: uuid.UUID

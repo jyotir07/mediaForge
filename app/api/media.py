@@ -2,6 +2,7 @@ import logging
 import uuid
 from collections.abc import AsyncIterator
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import select
@@ -13,6 +14,7 @@ from app.logging import log_event
 from app.media.sniff import ALLOWED_EXTENSIONS, MIME_TYPES, SNIFF_BYTES, is_consistent, sniff_container
 from app.models import Artifact, Job, Media
 from app.queue import redis_queue
+from app.schemas.job import JobAccepted
 from app.schemas.media import ArtifactOut, JobSummary, MediaMetadataOut, MediaOut, MediaUploadResponse
 from app.storage.local import Storage, TooLarge, media_key
 
@@ -138,3 +140,27 @@ async def get_media_metadata(
     if media.probe_status != "done":
         raise HTTPException(409, "probe not complete")
     return MediaMetadataOut.model_validate(media)
+
+
+async def _probed_media(session: AsyncSession, media_id: uuid.UUID) -> Media:
+    media = await _get_media(session, media_id)
+    if media.probe_status != "done":
+        raise HTTPException(409, "media has not been probed yet")
+    return media
+
+
+async def _submit(
+    request: Request, session: AsyncSession, media_id: uuid.UUID, job_type: str, config: dict[str, Any]
+) -> JobAccepted:
+    job, created = await service.create_or_get(session, media_id, job_type, config)
+    if created:
+        await _enqueue_best_effort(request, job)
+    return JobAccepted(job_id=job.id, status=job.status)
+
+
+@router.post("/media/{media_id}/proxy", status_code=202)
+async def request_proxy(
+    media_id: uuid.UUID, request: Request, session: AsyncSession = Depends(get_session)
+) -> JobAccepted:
+    await _probed_media(session, media_id)
+    return await _submit(request, session, media_id, "proxy", {"profile": "PROXY_STANDARD"})

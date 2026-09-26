@@ -16,12 +16,12 @@ from app.db import create_engine, create_session_factory
 from app.jobs import service
 from app.jobs.errors import ErrorCode, JobError, Recoverability, recoverability
 from app.jobs.service import RetryDecision
-from app.jobs.states import JobStatus
+from app.jobs.states import JobStatus, Stage
 from app.logging import configure_logging, log_event
 from app.models import Job, Media
 from app.queue import redis_queue
 from app.storage.local import Storage
-from app.workers import probe  # noqa: F401 - registers handlers
+from app.workers import probe, proxy  # noqa: F401 - registers handlers
 from app.workers.context import HANDLERS, JobContext, LeaseLost
 
 
@@ -152,7 +152,7 @@ class Worker:
                     attempt=job.attempt,
                     duration_ms=int((time.monotonic() - started) * 1000),
                 )
-                await self._publish(job, JobStatus.SUCCEEDED)
+                await self._publish(job, JobStatus.SUCCEEDED, stage=Stage.COMPLETED, progress=1.0)
         finally:
             beat.cancel()
             if not work.done():

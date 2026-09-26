@@ -3,10 +3,13 @@ from collections.abc import AsyncIterator
 import pytest
 from alembic import command
 from alembic.config import Config
+from redis.asyncio import Redis
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.models import Base
+from app.storage.local import Storage
+from app.workers.runner import Worker
 from tests.conftest import TEST_DATABASE_URL
 
 
@@ -52,3 +55,23 @@ async def session() -> AsyncIterator[AsyncSession]:
             await s.rollback()
     finally:
         await engine.dispose()
+
+
+@pytest.fixture
+async def redis(settings) -> AsyncIterator[Redis]:
+    r = Redis.from_url(settings.redis_url)
+    await r.flushdb()
+    yield r
+    await r.flushdb()
+    await r.aclose()
+
+
+@pytest.fixture
+def storage(settings) -> Storage:
+    settings.storage_root.mkdir(parents=True, exist_ok=True)
+    return Storage(settings.storage_root)
+
+
+@pytest.fixture
+def worker(settings, session_factory, redis, storage) -> Worker:
+    return Worker(settings, session_factory, redis, storage, lease_s=2, heartbeat_s=0.2, dequeue_timeout_s=1)

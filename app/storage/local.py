@@ -41,7 +41,8 @@ class Storage:
     def tmp_path(self, key: str) -> Path:
         final = self.path(key)
         final.parent.mkdir(parents=True, exist_ok=True)
-        return final.with_name(f"{final.name}.tmp-{uuid.uuid4().hex}")
+        # Keep the real extension last so tools like ffmpeg can infer the output format.
+        return final.with_name(f".tmp-{uuid.uuid4().hex}-{final.name}")
 
     def commit(self, tmp: Path, key: str) -> None:
         final = self.path(key)

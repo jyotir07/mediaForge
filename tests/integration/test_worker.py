@@ -2,37 +2,14 @@ import asyncio
 import uuid
 
 import pytest
-from redis.asyncio import Redis
 from sqlalchemy import select, text
 
 from app.jobs import service
 from app.jobs.states import JobStatus
 from app.models import Job, JobAttempt, Media
 from app.queue import redis_queue
-from app.storage.local import Storage
 from app.workers import context
-from app.workers.runner import Worker
 from tests.fixtures.make_videos import make_video
-
-
-@pytest.fixture
-async def redis(settings):
-    r = Redis.from_url(settings.redis_url)
-    await r.flushdb()
-    yield r
-    await r.flushdb()
-    await r.aclose()
-
-
-@pytest.fixture
-def storage(settings) -> Storage:
-    settings.storage_root.mkdir(parents=True, exist_ok=True)
-    return Storage(settings.storage_root)
-
-
-@pytest.fixture
-def worker(settings, session_factory, redis, storage) -> Worker:
-    return Worker(settings, session_factory, redis, storage, lease_s=2, heartbeat_s=0.2, dequeue_timeout_s=1)
 
 
 @pytest.fixture
@@ -223,3 +200,24 @@ async def test_lost_lease_cancels_handler_and_writes_nothing(
     assert await asyncio.wait_for(run, timeout=5)
     job = await _job(session_factory, job_id)
     assert (job.status, job.worker_id) == (JobStatus.RUNNING, "someone-else")
+
+
+async def test_success_event_reports_completion(session_factory, redis, storage, worker, sample_video):
+    import json
+
+    media = await _media_with_source(session_factory, storage, sample_video.read_bytes())
+    job_id = await _queued_probe(session_factory, redis, media.id)
+    pubsub = redis.pubsub()
+    await pubsub.subscribe(redis_queue.progress_channel(job_id))
+
+    assert await worker.run_once()
+
+    events = []
+    for _ in range(10):  # the subscribe confirmation also yields None, so poll a bounded number of times
+        msg = await pubsub.get_message(ignore_subscribe_messages=True, timeout=0.2)
+        if msg is not None:
+            events.append(json.loads(msg["data"]))
+    await pubsub.aclose()
+    assert events[-1]["status"] == "SUCCEEDED"
+    assert events[-1]["progress"] == 1.0
+    assert events[-1]["stage"] == "COMPLETED"

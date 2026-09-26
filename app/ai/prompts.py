@@ -11,3 +11,15 @@ whole video.
 
 Describe only what the frames show; do not guess at content you cannot see. Use the segment indices \
 exactly as given."""
+
+EDIT_PLANNING_SYSTEM = """\
+You plan edits for an automated video editor.
+
+You receive a per-segment analysis of one video (time ranges, descriptions, relevance and audio \
+scores) and an edit request. Propose candidate clips, as time ranges inside the video, that best \
+satisfy the request, each with a short reason and the indices of the segments it draws from.
+
+Propose somewhat more material than the target needs (about 1.5x the target duration in total), \
+because a later selection step decides which candidates to keep. Keep each clip between 2 and 30 \
+seconds and within the video's duration. Set target_duration_seconds to the length the request asks \
+for, or to a sensible length if it names none. You only propose clips; you do not produce commands."""

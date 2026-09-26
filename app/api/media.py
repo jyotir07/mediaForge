@@ -15,7 +15,14 @@ from app.media.sniff import ALLOWED_EXTENSIONS, MIME_TYPES, SNIFF_BYTES, is_cons
 from app.models import Artifact, Job, Media
 from app.queue import redis_queue
 from app.schemas.job import JobAccepted
-from app.schemas.media import ArtifactOut, JobSummary, MediaMetadataOut, MediaOut, MediaUploadResponse
+from app.schemas.media import (
+    ArtifactOut,
+    EditRequest,
+    JobSummary,
+    MediaMetadataOut,
+    MediaOut,
+    MediaUploadResponse,
+)
 from app.storage.local import Storage, TooLarge, media_key
 
 router = APIRouter()
@@ -172,3 +179,16 @@ async def request_analysis(
 ) -> JobAccepted:
     await _probed_media(session, media_id)
     return await _submit(request, session, media_id, "analyze", {"version": 1})
+
+
+@router.post("/media/{media_id}/edit", status_code=202)
+async def request_edit(
+    media_id: uuid.UUID, body: EditRequest, request: Request, session: AsyncSession = Depends(get_session)
+) -> JobAccepted:
+    await _get_media(session, media_id)
+    analyzed = await session.scalar(
+        select(Artifact.id).where(Artifact.media_id == media_id, Artifact.type == "ANALYSIS")
+    )
+    if analyzed is None:
+        raise HTTPException(409, "media has not been analyzed yet")
+    return await _submit(request, session, media_id, "edit", {"request": body.normalized()})

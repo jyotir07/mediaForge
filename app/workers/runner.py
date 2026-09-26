@@ -22,7 +22,7 @@ from app.logging import configure_logging, log_event
 from app.models import Job, Media
 from app.queue import redis_queue
 from app.storage.local import Storage
-from app.workers import analysis, probe, proxy  # noqa: F401 - registers handlers
+from app.workers import analysis, edit, export, probe, proxy  # noqa: F401 - registers handlers
 from app.workers.context import HANDLERS, JobContext, LeaseLost
 from app.workers.recovery import decide_retry
 

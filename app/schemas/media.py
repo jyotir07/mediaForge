@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class MediaUploadResponse(BaseModel):
@@ -55,3 +55,18 @@ class MediaMetadataOut(BaseModel):
     container: str
     bitrate: int | None
     size_bytes: int
+
+
+class EditRequest(BaseModel):
+    request: str = Field(min_length=1, max_length=500)
+
+    @field_validator("request")
+    @classmethod
+    def _not_blank(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("request must not be blank")
+        return v
+
+    def normalized(self) -> str:
+        # Equivalent phrasings ("  Make a REEL") share one idempotency key and therefore one job.
+        return " ".join(self.request.split()).lower()

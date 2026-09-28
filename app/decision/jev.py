@@ -1,7 +1,8 @@
 """The only module that talks to Jev (TypeSafe's classifier model, via `langchain-typesafe`).
 
 API verified against langchain-typesafe 0.0.1a3 source:
-- TypeSafeClassifier(api_key=..., timeout=...) -> .ainvoke({"state": ..., "questions": {...}})
+- TypeSafeClassifier(api_key=..., base_url=..., timeout=...) -> .ainvoke({"state": ..., "questions": {...}})
+  (POSTs to {base_url}/v1/systemone with a Bearer key, matching https://jevmodel.org/docs/)
 - Choice(instructions, criteria={label: description}) -> response.choices[id].choice / .confidence
 - Score(instructions, criteria=[level0, level1, ...]) -> response.scores[id].score (fractional) / .confidence
 - Errors derive from langchain_typesafe.client.TypeSafeError; a missing key raises ValueError at construction.
@@ -23,8 +24,8 @@ class JevLike(Protocol):
 
 
 class JevClient:
-    def __init__(self, api_key: str, timeout_s: float = DEFAULT_TIMEOUT_S):
-        self._classifier = TypeSafeClassifier(api_key=api_key, timeout=timeout_s)
+    def __init__(self, api_key: str, base_url: str, timeout_s: float = DEFAULT_TIMEOUT_S):
+        self._classifier = TypeSafeClassifier(api_key=api_key, base_url=base_url, timeout=timeout_s)
 
     async def ask(self, state: dict[str, Any], questions: dict[str, Question]) -> ClassifierResponse:
         return await self._classifier.ainvoke({"state": state, "questions": questions})

@@ -81,7 +81,7 @@ source (`rules` / `jev` / `fallback`) and confidence.
 Requirements: Docker with Compose.
 
 ```bash
-cp .env.example .env        # add ANTHROPIC_API_KEY and TYPESAFE_API_KEY
+cp .env.example .env        # add ANTHROPIC_API_KEY and JEVMODEL_API_KEY
 docker compose up -d --build
 open http://localhost:8000  # minimal UI: upload → proxy → analyze → edit → watch progress → play export
 ```
@@ -91,7 +91,8 @@ open http://localhost:8000  # minimal UI: upload → proxy → analyze → edit 
 | `ANTHROPIC_API_KEY` | – | LLM for scene analysis and edit planning |
 | `LLM_MODEL` | `claude-opus-5` | any Claude model id |
 | `LLM_BACKEND` | `anthropic` | `fake` disables the LLM (analysis/edit jobs then fail with a clear error) |
-| `TYPESAFE_API_KEY` | – | Jev; without it every decision uses its deterministic fallback |
+| `JEVMODEL_API_KEY` | – | Jev; without it every decision uses its deterministic fallback |
+| `JEV_BASE_URL` | `https://jevmodel.org` | Jev API host |
 | `DECISION_BACKEND` | `jev` | `fake` forces fallback-only decisions |
 
 The worker runs as its own service (`worker`), and you can scale it with `docker compose up -d --scale worker=3`.

@@ -84,12 +84,12 @@ async def test_upload_to_export_over_http(settings, client_factory, worker, stor
 LIVE = (
     os.environ.get("MEDIAFORGE_LIVE") == "1"
     and bool(os.environ.get("ANTHROPIC_API_KEY"))
-    and bool(os.environ.get("TYPESAFE_API_KEY"))
+    and bool(os.environ.get("JEVMODEL_API_KEY"))
 )
 
 
 @pytest.mark.skipif(
-    not LIVE, reason="set MEDIAFORGE_LIVE=1 with ANTHROPIC_API_KEY and TYPESAFE_API_KEY (spends money)"
+    not LIVE, reason="set MEDIAFORGE_LIVE=1 with ANTHROPIC_API_KEY and JEVMODEL_API_KEY (spends money)"
 )
 async def test_live_pipeline_with_real_llm_and_jev(settings, client_factory, worker, tmp_path):
     worker.llm = create_llm(settings)

@@ -27,10 +27,10 @@ class DecisionLayer:
 def create_decision_layer(settings: Settings) -> DecisionLayer:
     jev: JevLike | None = None
     if settings.decision_backend == "jev":
-        if settings.typesafe_api_key is None:
-            log_event("decision.jev_unconfigured", level=logging.WARNING, detail="TYPESAFE_API_KEY not set")
+        if settings.jevmodel_api_key is None:
+            log_event("decision.jev_unconfigured", level=logging.WARNING, detail="JEVMODEL_API_KEY not set")
         else:
-            jev = JevClient(settings.typesafe_api_key.get_secret_value())
+            jev = JevClient(settings.jevmodel_api_key.get_secret_value(), settings.jev_base_url)
     return DecisionLayer.with_jev(jev)
 
 

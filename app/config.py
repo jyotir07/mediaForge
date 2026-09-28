@@ -19,7 +19,9 @@ class Settings(BaseSettings):
     anthropic_api_key: SecretStr | None = None
 
     decision_backend: Literal["jev", "fake"] = "jev"
-    typesafe_api_key: SecretStr | None = None
+    jevmodel_api_key: SecretStr | None = None
+    # langchain-typesafe defaults to api.typesafe.ai; keys minted at jevmodel.org authenticate against this host.
+    jev_base_url: str = "https://jevmodel.org"
 
 
 @lru_cache

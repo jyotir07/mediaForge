@@ -97,6 +97,10 @@ open http://localhost:8000  # minimal UI: upload → proxy → analyze → edit 
 
 The worker runs as its own service (`worker`), and you can scale it with `docker compose up -d --scale worker=3`.
 
+Write values in `.env` without quotes or surrounding spaces. Compose reads `.env` only when it creates a container,
+so after editing it run `docker compose up -d --force-recreate api worker`; `docker compose restart` keeps the old
+values.
+
 ### API
 
 ```text
@@ -148,10 +152,3 @@ These numbers were measured in development (Docker Desktop on Windows 11, one wo
 - No transcription: clip relevance comes from frames and audio presence only.
 - Storage is the local filesystem behind a small interface; there is no S3 implementation.
 - No auth, cancellation or multi-tenancy (explicit non-goals for the MVP).
-
-### To run (post fix ie):
-1. In .env, set JEVMODEL_API_KEY=sk-... and the new ANTHROPIC_API_KEY, with no quotes or spaces.
-2. Get Docker Desktop responding again (restart it), then:
-- docker compose up -d --force-recreate api worker     # restart alone won't pick up new .env values
-- docker compose run --rm --no-deps api pytest -q
-- docker compose run --rm --no-deps api sh -c "ruff format app tests && ruff check app tests migrations && mypy app"

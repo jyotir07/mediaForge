@@ -94,6 +94,7 @@ open http://localhost:8000  # minimal UI: upload → proxy → analyze → edit 
 | `JEVMODEL_API_KEY` | – | Jev; without it every decision uses its deterministic fallback |
 | `JEV_BASE_URL` | `https://jevmodel.org` | Jev API host |
 | `DECISION_BACKEND` | `jev` | `fake` forces fallback-only decisions |
+| `MAX_UPLOAD_BYTES` | `2147483648` (2 GiB) | larger uploads get `413` (checked against `Content-Length` and while streaming) |
 
 The worker runs as its own service (`worker`), and you can scale it with `docker compose up -d --scale worker=3`.
 

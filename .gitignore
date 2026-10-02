@@ -6,3 +6,8 @@ __pycache__/
 .ruff_cache/
 .venv/
 data/
+.idea/
+.vscode/
+.coverage
+htmlcov/
+*.egg-info/

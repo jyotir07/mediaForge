@@ -119,6 +119,7 @@ GET  /artifacts/{id}/file       · GET /healthz
 
 ```bash
 docker compose run --rm api pytest -q           # unit + integration (real Postgres, Redis, ffmpeg)
+docker compose run --rm api ruff format --check app tests
 docker compose run --rm api ruff check app tests migrations
 docker compose run --rm api mypy app
 MEDIAFORGE_LIVE=1 docker compose run --rm -e MEDIAFORGE_LIVE api pytest tests/integration/test_e2e.py  # real LLM + Jev (costs money)

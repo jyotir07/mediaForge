@@ -48,6 +48,13 @@ services:
     <<: *app
     ports:
       - "8000:8000"
+    healthcheck:
+      # The slim image has no curl. uvicorn only starts after migrations succeed, so 200 implies schema is ready.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz', timeout=2)"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
 
   worker:
     <<: *app
@@ -58,7 +65,7 @@ services:
       redis:
         condition: service_healthy
       api:
-        condition: service_started  # the api container applies migrations on start
+        condition: service_healthy  # the api container applies migrations on start
 
 volumes:
   pgdata:
